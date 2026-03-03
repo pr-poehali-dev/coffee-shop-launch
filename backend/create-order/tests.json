@@ -1,0 +1,38 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Create order successfully",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "name": "Тест Тестович",
+        "phone": "+7 (999) 123-45-67",
+        "email": "test@example.com",
+        "address": "Москва, ул. Тестовая, 1",
+        "comment": "Позвоните перед доставкой",
+        "items": [
+          {"id": 1, "name": "Moka Pro X1", "price": "12 900 ₽", "price_int": 12900, "qty": 1}
+        ],
+        "total_price": 12900
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "Validation error - missing phone",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "name": "Тест",
+        "items": [{"id": 1, "name": "Moka Pro X1", "qty": 1}],
+        "total_price": 12900
+      },
+      "expectedStatus": 400
+    }
+  ]
+}
