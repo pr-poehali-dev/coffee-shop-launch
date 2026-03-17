@@ -1,10 +1,82 @@
 import json
 import os
+import smtplib
 import psycopg2
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+
+def send_email_notification(order_id, name, phone, email, address, comment, items, total_price):
+    """Отправляет уведомление о новом заказе на почту владельца."""
+    smtp_login = os.environ.get('SMTP_LOGIN', '')
+    smtp_password = os.environ.get('SMTP_PASSWORD', '')
+    notify_email = os.environ.get('NOTIFY_EMAIL', '')
+
+    if not smtp_login or not smtp_password or not notify_email:
+        return
+
+    items_html = ''.join(
+        f"<tr><td style='padding:4px 8px'>{i.get('name','')}</td>"
+        f"<td style='padding:4px 8px;text-align:center'>{i.get('qty','')}</td>"
+        f"<td style='padding:4px 8px;text-align:right'>{i.get('price','')}</td></tr>"
+        for i in items
+    )
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px">
+      <h2 style="color:#333">Новый заказ #{order_id}</h2>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <tr><td style="padding:4px 8px;color:#666">Имя:</td><td style="padding:4px 8px"><b>{name}</b></td></tr>
+        <tr><td style="padding:4px 8px;color:#666">Телефон:</td><td style="padding:4px 8px"><b>{phone}</b></td></tr>
+        {"<tr><td style='padding:4px 8px;color:#666'>Email:</td><td style='padding:4px 8px'>" + email + "</td></tr>" if email else ""}
+        {"<tr><td style='padding:4px 8px;color:#666'>Адрес:</td><td style='padding:4px 8px'>" + address + "</td></tr>" if address else ""}
+        {"<tr><td style='padding:4px 8px;color:#666'>Комментарий:</td><td style='padding:4px 8px'>" + comment + "</td></tr>" if comment else ""}
+      </table>
+      <h3 style="color:#333">Состав заказа</h3>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #eee">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:6px 8px;text-align:left">Товар</th>
+            <th style="padding:6px 8px">Кол-во</th>
+            <th style="padding:6px 8px;text-align:right">Цена</th>
+          </tr>
+        </thead>
+        <tbody>{items_html}</tbody>
+      </table>
+      <p style="font-size:18px;margin-top:16px">Итого: <b>{total_price} ₽</b></p>
+    </div>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = f'Новый заказ #{order_id} — {name}'
+    msg['From'] = smtp_login
+    msg['To'] = notify_email
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+    domain = smtp_login.split('@')[-1].lower()
+    if 'yandex' in domain or 'ya.ru' in domain:
+        host, port = 'smtp.yandex.ru', 465
+        use_ssl = True
+    elif 'mail.ru' in domain or 'bk.ru' in domain or 'list.ru' in domain or 'inbox.ru' in domain:
+        host, port = 'smtp.mail.ru', 465
+        use_ssl = True
+    else:
+        host, port = 'smtp.gmail.com', 465
+        use_ssl = True
+
+    if use_ssl:
+        server = smtplib.SMTP_SSL(host, port)
+    else:
+        server = smtplib.SMTP(host, port)
+        server.starttls()
+
+    server.login(smtp_login, smtp_password)
+    server.sendmail(smtp_login, notify_email, msg.as_string())
+    server.quit()
 
 
 def handler(event: dict, context) -> dict:
-    """Принимает заказ из корзины и сохраняет в базу данных."""
+    """Принимает заказ из корзины, сохраняет в базу данных и отправляет email-уведомление."""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {
@@ -59,6 +131,11 @@ def handler(event: dict, context) -> dict:
     conn.commit()
     cur.close()
     conn.close()
+
+    try:
+        send_email_notification(order_id, name, phone, email, address, comment, items, total_price)
+    except Exception as e:
+        print(f"Email notification failed: {e}")
 
     return {
         'statusCode': 200,
