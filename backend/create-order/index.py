@@ -90,7 +90,7 @@ def send_email_confirmation(order_id, name, email, address, comment, items, tota
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
       <div style="background:#1a1a1a;padding:24px 32px;text-align:center">
-        <h1 style="color:#fff;margin:0;font-size:28px;letter-spacing:4px">BREW</h1>
+        <h1 style="color:#fff;margin:0;font-size:28px;letter-spacing:4px">MyBarista</h1>
       </div>
       <div style="padding:32px">
         <h2 style="margin-top:0">Ваш заказ принят!</h2>
@@ -112,13 +112,13 @@ def send_email_confirmation(order_id, name, email, address, comment, items, tota
         <p style="color:#666;font-size:14px;margin-top:32px">Если у вас есть вопросы — просто ответьте на это письмо.</p>
       </div>
       <div style="background:#f5f5f5;padding:16px 32px;text-align:center;font-size:12px;color:#999">
-        BREW — премиальные кофемолки и кофемашины
+        MyBarista — премиальные кофемолки и кофемашины
       </div>
     </div>
     """
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = f'Заказ #{order_id} принят — BREW'
+    msg['Subject'] = f'Заказ #{order_id} принят — MyBarista'
     msg['From'] = smtp_login
     msg['To'] = email
     msg.attach(MIMEText(html, 'html', 'utf-8'))
