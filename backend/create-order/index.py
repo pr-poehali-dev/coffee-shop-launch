@@ -75,8 +75,67 @@ def send_email_notification(order_id, name, phone, email, address, comment, item
     server.quit()
 
 
+def send_email_confirmation(order_id, name, email, address, comment, items, total_price, smtp_login, smtp_password, host, port, use_ssl):
+    """Отправляет покупателю подтверждение заказа."""
+    if not email:
+        return
+
+    items_html = ''.join(
+        f"<tr><td style='padding:6px 12px'>{i.get('name','')}</td>"
+        f"<td style='padding:6px 12px;text-align:center'>{i.get('qty','')}</td>"
+        f"<td style='padding:6px 12px;text-align:right'>{i.get('price','')}</td></tr>"
+        for i in items
+    )
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
+      <div style="background:#1a1a1a;padding:24px 32px;text-align:center">
+        <h1 style="color:#fff;margin:0;font-size:28px;letter-spacing:4px">BREW</h1>
+      </div>
+      <div style="padding:32px">
+        <h2 style="margin-top:0">Ваш заказ принят!</h2>
+        <p>Привет, {name}! Мы получили ваш заказ <b>#{order_id}</b> и скоро свяжемся с вами для подтверждения.</p>
+        <h3>Состав заказа</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #eee">
+          <thead>
+            <tr style="background:#f5f5f5">
+              <th style="padding:8px 12px;text-align:left">Товар</th>
+              <th style="padding:8px 12px">Кол-во</th>
+              <th style="padding:8px 12px;text-align:right">Цена</th>
+            </tr>
+          </thead>
+          <tbody>{items_html}</tbody>
+        </table>
+        <p style="font-size:20px;margin-top:16px">Итого: <b>{total_price} ₽</b></p>
+        {"<p><b>Адрес доставки:</b> " + address + "</p>" if address else ""}
+        {"<p><b>Комментарий:</b> " + comment + "</p>" if comment else ""}
+        <p style="color:#666;font-size:14px;margin-top:32px">Если у вас есть вопросы — просто ответьте на это письмо.</p>
+      </div>
+      <div style="background:#f5f5f5;padding:16px 32px;text-align:center;font-size:12px;color:#999">
+        BREW — премиальные кофемолки и кофемашины
+      </div>
+    </div>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = f'Заказ #{order_id} принят — BREW'
+    msg['From'] = smtp_login
+    msg['To'] = email
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+    if use_ssl:
+        server = smtplib.SMTP_SSL(host, port)
+    else:
+        server = smtplib.SMTP(host, port)
+        server.starttls()
+
+    server.login(smtp_login, smtp_password)
+    server.sendmail(smtp_login, email, msg.as_string())
+    server.quit()
+
+
 def handler(event: dict, context) -> dict:
-    """Принимает заказ из корзины, сохраняет в базу данных и отправляет email-уведомление."""
+    """Принимает заказ из корзины, сохраняет в базу данных и отправляет email-уведомления владельцу и покупателю."""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {
@@ -132,10 +191,26 @@ def handler(event: dict, context) -> dict:
     cur.close()
     conn.close()
 
+    smtp_login = os.environ.get('SMTP_LOGIN', '')
+    smtp_password = os.environ.get('SMTP_PASSWORD', '')
+
+    domain = smtp_login.split('@')[-1].lower() if smtp_login else ''
+    if 'yandex' in domain or 'ya.ru' in domain:
+        host, port, use_ssl = 'smtp.yandex.ru', 465, True
+    elif 'mail.ru' in domain or 'bk.ru' in domain or 'list.ru' in domain or 'inbox.ru' in domain:
+        host, port, use_ssl = 'smtp.mail.ru', 465, True
+    else:
+        host, port, use_ssl = 'smtp.gmail.com', 465, True
+
     try:
         send_email_notification(order_id, name, phone, email, address, comment, items, total_price)
     except Exception as e:
-        print(f"Email notification failed: {e}")
+        print(f"Owner email notification failed: {e}")
+
+    try:
+        send_email_confirmation(order_id, name, email, address, comment, items, total_price, smtp_login, smtp_password, host, port, use_ssl)
+    except Exception as e:
+        print(f"Customer email confirmation failed: {e}")
 
     return {
         'statusCode': 200,
