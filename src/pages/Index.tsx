@@ -109,7 +109,7 @@ export default function Index() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-cream/90 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <button onClick={() => navigate("home")} className="font-display text-2xl font-light tracking-[0.2em] text-espresso hover:text-latte transition-colors">
-            BREW
+            MyBarista
           </button>
 
           <nav className="hidden md:flex items-center gap-8">
